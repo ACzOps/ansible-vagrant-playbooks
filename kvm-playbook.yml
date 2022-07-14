@@ -1,0 +1,106 @@
+# Playbook to install Vagrant and KVM on Ubuntu/Debian systems 
+
+---
+- name: Playbook to install KVM hypervisor and Vagrant with plugins
+  hosts: localhost
+  become: true
+  gather_facts: true
+
+  tasks:
+  - name: Install required packages for KVM
+    apt:
+      update_cache: true
+      name:
+        - bridge-utils 
+        - cpu-checker 
+        - libvirt-clients 
+        - libvirt-daemon 
+        - qemu 
+        - qemu-kvm
+      state: latest
+
+  - name: Check if CPU is capable to virtualize 
+    shell: kvm-ok | grep -c 'KVM acceleration can be used'
+    register: status
+    failed_when: status.stdout != "1"
+
+  - name: Download GPG key from Hashicorp
+    shell: wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+  - name: Check if archive keyring from Hashicorp exists
+    stat:
+      path: "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+    register: result
+    failed_when: not result.stat.exists
+
+  - name: Add new Hashicorp repository to repositories directory
+    shell: echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+  - name: Check if Hashicorp repository file exists
+    stat:
+      path: "/etc/apt/sources.list.d/hashicorp.list"
+    register: result
+    failed_when: not result.stat.exists
+
+  - name: Workaround for Linux Mint repository equivalent to Ubuntu one for Hashicorp
+    replace:
+      path: /etc/apt/sources.list.d/hashicorp.list
+      regexp: '\buna\b'
+      replace: 'focal'
+
+  - name: Update Aptitute and install Vagrant
+    apt:
+      update_cache: true
+      name: vagrant
+      state: latest
+
+  - name: Install all dependencies for vagrant-libvirt plugin to integrate Vagrant with KVM
+    apt:
+      name:
+        - libvirt-daemon-system
+        - libxslt-dev
+        - libxml2-dev
+        - libvirt-dev
+        - zlib1g-dev
+        - ruby-dev
+        - ruby-libvirt
+        - ebtables
+        - dnsmasq-base
+      state: latest
+
+  # Vagrant plugins installation
+  # TODO: check if it can be done as a loop in Jinja2 to not repeat code three times
+
+  - name: Check if ruby-libvirt is installed
+    shell: vagrant plugin list | grep ruby-libvirt
+    register: ruby
+    
+  - name: Install ruby-libvirt
+    command: vagrant plugin install ruby-libvirt
+    when: ruby.stdout | length == 0
+
+  - name: Check if vagrant-libvirt is installed
+    shell: vagrant plugin list | grep vagrant-libvirt
+    register: vagrant
+
+  - name: Install Vagrant plugin for libvirt
+    command: vagrant plugin install vagrant-libvirt
+    when: vagrant.stdout | length == 0
+  
+  - name: Check if vagrant-mutate is installed
+    shell: vagrant plugin list | grep vagrant-mutate
+    register: mutate
+
+  - name: Install Vagrant plugin to convert other boxes to work with different providers
+    command: vagrant plugin install vagrant-mutate
+    when: mutate.stdout | length == 0
+
+  - name: Add environment variable to use KVM provider by default
+    lineinfile:
+      path: /etc/profile.d/vagrant.sh
+      regexp: "\bVAGRANT_DEFAULT_PROVIDER(.*)"
+      line: "{{ 'export VAGRANT_DEFAULT_PROVIDER=libvirt' }}"       # because underscores are problematic in YAML :(
+      create: yes
+      mode: '0644'
+      owner: root
+      group: root
