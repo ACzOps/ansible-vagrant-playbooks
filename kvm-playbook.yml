@@ -3,11 +3,12 @@
 ---
 - name: Playbook to install KVM hypervisor and Vagrant with plugins
   hosts: localhost
-  become: true
+  #become: true
   gather_facts: true
 
   tasks:
   - name: Install required packages for KVM
+    become: true
     apt:
       update_cache: true
       name:
@@ -24,6 +25,7 @@
     register: status
     failed_when: status.stdout != "1"
 
+    # TODO: rewrite it according to Ansible lint
   - name: Download GPG key from HashiCorp
     shell: wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
@@ -43,18 +45,22 @@
     failed_when: not result.stat.exists
 
   - name: Workaround to have Ubuntu version equivalent of Linux Mint to get correct source in HashiCorp repository
+    become: true
     replace:
       path: /etc/apt/sources.list.d/hashicorp.list
       regexp: '\buna\b'
       replace: 'focal'
 
   - name: Update Aptitute and install Vagrant
+    become: true
     apt:
       update_cache: true
       name: vagrant
       state: latest
 
+  # TODO: make apt installation in one task
   - name: Install all dependencies for vagrant-libvirt plugin to integrate Vagrant with KVM
+    become: true
     apt:
       name:
         - libvirt-daemon-system
@@ -68,26 +74,28 @@
         - dnsmasq-base
       state: latest
 
-  # Vagrant plugins installation
-  # TODO: check if it can be done as a loop in Jinja2 to not repeat code three times
+# Vagrant plugins installation
 
   - name: Check if vagrant-libvirt is already installed
     shell: vagrant plugin list | grep vagrant-libvirt
     register: vagrant
+    failed_when: "vagrant.rc == 2"      # this is quirkyness of grep to return 1 when nothing's found, 2 is true exception
 
-  - name: Install Vagrant plugin for libvirt
+  - name: Install Vagrant plugin for libvirt 
     command: vagrant plugin install vagrant-libvirt
     when: vagrant.stdout | length == 0
   
   - name: Check if vagrant-mutate is already installed
     shell: vagrant plugin list | grep vagrant-mutate
     register: mutate
+    failed_when: "mutate.rc == 2"
 
   - name: Install Vagrant plugin to convert other boxes to work with different providers
     command: vagrant plugin install vagrant-mutate
     when: mutate.stdout | length == 0
-
+    
   - name: Add environment variable to use KVM provider by default
+    become: true
     lineinfile:
       path: /etc/profile.d/vagrant.sh
       regexp: "\bVAGRANT_DEFAULT_PROVIDER(.*)"
