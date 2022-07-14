@@ -71,15 +71,7 @@
   # Vagrant plugins installation
   # TODO: check if it can be done as a loop in Jinja2 to not repeat code three times
 
-  - name: Check if ruby-libvirt is installed
-    shell: vagrant plugin list | grep ruby-libvirt
-    register: ruby
-    
-  - name: Install ruby-libvirt
-    command: vagrant plugin install ruby-libvirt
-    when: ruby.stdout | length == 0
-
-  - name: Check if vagrant-libvirt is installed
+  - name: Check if vagrant-libvirt is already installed
     shell: vagrant plugin list | grep vagrant-libvirt
     register: vagrant
 
@@ -87,7 +79,7 @@
     command: vagrant plugin install vagrant-libvirt
     when: vagrant.stdout | length == 0
   
-  - name: Check if vagrant-mutate is installed
+  - name: Check if vagrant-mutate is already installed
     shell: vagrant plugin list | grep vagrant-mutate
     register: mutate
 
