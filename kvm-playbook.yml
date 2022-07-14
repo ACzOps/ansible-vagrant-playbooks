@@ -24,25 +24,25 @@
     register: status
     failed_when: status.stdout != "1"
 
-  - name: Download GPG key from Hashicorp
+  - name: Download GPG key from HashiCorp
     shell: wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-  - name: Check if archive keyring from Hashicorp exists
+  - name: Check if archive keyring from HashiCorp exists
     stat:
       path: "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
     register: result
     failed_when: not result.stat.exists
 
-  - name: Add new Hashicorp repository to repositories directory
+  - name: Add new HashiCorp source to Aptitute sources directory
     shell: echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
-  - name: Check if Hashicorp repository file exists
+  - name: Check if HashiCorp source list file exists
     stat:
       path: "/etc/apt/sources.list.d/hashicorp.list"
     register: result
     failed_when: not result.stat.exists
 
-  - name: Workaround for Linux Mint repository equivalent to Ubuntu one for Hashicorp
+  - name: Workaround to have Ubuntu version equivalent of Linux Mint to get correct source in HashiCorp repository
     replace:
       path: /etc/apt/sources.list.d/hashicorp.list
       regexp: '\buna\b'
